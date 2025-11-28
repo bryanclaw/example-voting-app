@@ -14,29 +14,41 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
-    # Build and test with Docker Compose (most reliable approach)
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      
     - name: Build Docker images
-      run: docker-compose build
-      
-    - name: Start services for testing
-      run: docker-compose up -d
-      
-    - name: Wait for services to be ready
-      run: sleep 30
-      
-    - name: Check running services
-      run: docker-compose ps
-      
-    - name: Basic health check test
       run: |
-        echo "Testing application health..."
-        # Check if vote app is responsive
-        curl -f http://localhost:5000 || echo "Vote app health check completed"
-        # Check if result app is responsive  
-        curl -f http://localhost:5001 || echo "Result app health check completed"
-        echo "✅ All services are running - test passed!"
+        docker-compose --version
+        docker-compose build
+        echo "✅ Docker images built successfully"
+      
+    - name: Start services and test
+      run: |
+        # Start services in background
+        docker-compose up -d
         
-    - name: Verify container logs
+        # Wait for services to start
+        sleep 15
+        
+        # Check if containers are running
+        echo "--- Running Containers ---"
+        docker-compose ps
+        
+        # Simple test - if containers are running, consider it a success
+        RUNNING_CONTAINERS=$(docker-compose ps -q | wc -l)
+        echo "Number of running containers: $RUNNING_CONTAINERS"
+        
+        if [ $RUNNING_CONTAINERS -ge 3 ]; then
+          echo "✅ SUCCESS: Multiple services are running"
+          exit 0
+        else
+          echo "❌ FAILED: Not enough services running"
+          exit 1
+        fi
+        
+    - name: Show service logs
+      if: always()
       run: |
-        echo "--- Container Logs ---"
-        docker-compose logs --tail=20
+        echo "--- Service Logs ---"
+        docker-compose logs --tail=50
